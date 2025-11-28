@@ -1,0 +1,38 @@
+/* app/globals.css */
+
+/* Tailwind v4 import – lädt Preflight + Utilities */
+@import "tailwindcss";
+
+/* Ein paar sehr einfache globale Basis-Styles für LeadRadar */
+
+:root {
+  color-scheme: light;
+}
+
+/* Box-Sizing-Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background-color: #f1f5f9; /* ungefähr Tailwind slate-100 */
+  color: #020617; /* Tailwind slate-950 */
+}
+
+/* Links dezent */
+a {
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}

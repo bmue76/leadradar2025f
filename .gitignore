@@ -1,0 +1,43 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build-Output (Next.js / React)
+.next/
+out/
+dist/
+.vercel/
+
+# Logs
+logs/
+*.log
+
+# Env-Dateien
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Prisma / SQLite
+**/dev.db
+
+# Coverage / Tests
+coverage/
+
+# OS-spezifisch
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Expo / Mobile (für spätere Mobile-App)
+.expo/
+**/.expo/
+android/
+ios/

@@ -1,0 +1,20 @@
+// prisma/schema.prisma
+
+generator client {
+  // Klassischer Client über @prisma/client (passt zu unserem Setup)
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Nur noch der Provider – KEIN url-Feld mehr in Prisma 7
+  provider = "sqlite"
+}
+
+// Minimales Start-Schema – wird in Teilprojekt 1.2 erweitert.
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
