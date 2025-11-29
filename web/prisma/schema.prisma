@@ -1,20 +1,165 @@
-// prisma/schema.prisma
+// web/prisma/schema.prisma
 
 generator client {
-  // Klassischer Client über @prisma/client (passt zu unserem Setup)
   provider = "prisma-client-js"
 }
 
+// --------------------------------------------------
+// Datasource (nur Provider – URL liegt in prisma.config.ts)
+// --------------------------------------------------
+
 datasource db {
-  // Nur noch der Provider – KEIN url-Feld mehr in Prisma 7
   provider = "sqlite"
 }
 
-// Minimales Start-Schema – wird in Teilprojekt 1.2 erweitert.
+// --------------------------------------------------
+// Enums
+// --------------------------------------------------
+
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum FieldType {
+  TEXT          // Einzeilige Texteingabe
+  TEXTAREA      // Mehrzeilige Texteingabe
+  SINGLE_SELECT // Eine Auswahl (Dropdown/Radio)
+  MULTI_SELECT  // Mehrere Auswahlen (Checkbox-Gruppe)
+  NUMBER        // Numerische Eingabe
+  EMAIL         // E-Mail mit spezieller Validierung
+  PHONE         // Telefonnummer
+  DATE          // Datum
+  DATETIME      // Datum + Zeit
+  BOOLEAN       // Ja/Nein, Checkbox/Switch
+}
+
+// --------------------------------------------------
+// User (minimal, aus Teilprojekt 1.1 + Relation zu Leads)
+// --------------------------------------------------
+
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int    @id @default(autoincrement())
+  email        String @unique
+  name         String?
+
+  // Leads, die von diesem User erfasst wurden (optional)
+  leadsCaptured Lead[] @relation("UserLeads")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// --------------------------------------------------
+// Event – optional, aber bereits im Modell
+// --------------------------------------------------
+
+model Event {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  location    String?
+
+  leads       Lead[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --------------------------------------------------
+// Form – Lead-Formular
+// --------------------------------------------------
+
+model Form {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  status      FormStatus   @default(DRAFT)
+
+  fields      FormField[]
+  leads       Lead[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// --------------------------------------------------
+// FormField – Felder eines Formulars
+// --------------------------------------------------
+
+model FormField {
+  id        Int       @id @default(autoincrement())
+  formId    Int
+  form      Form      @relation(fields: [formId], references: [id])
+
+  /// Technischer Key, z. B. "firstName", "company"
+  key       String
+
+  /// Label für UI, z. B. "Vorname", "Firma"
+  label     String
+
+  type      FieldType
+
+  /// Sortierung innerhalb des Formulars
+  order     Int       @default(0)
+
+  /// Pflichtfeld ja/nein
+  required  Boolean   @default(false)
+
+  /// Optionen für SINGLE/MULTI_SELECT (z. B. "A;B;C" oder JSON)
+  options   String?
+
+  leadValues LeadValue[]
+
+  @@unique([formId, key])
+  @@index([formId, order])
+}
+
+// --------------------------------------------------
+// Lead – erfasster Messekontakt
+// --------------------------------------------------
+
+model Lead {
+  id               Int       @id @default(autoincrement())
+  formId           Int
+  form             Form      @relation(fields: [formId], references: [id])
+
+  eventId          Int?
+  event            Event?    @relation(fields: [eventId], references: [id])
+
+  capturedByUserId Int?
+  capturedBy       User?     @relation("UserLeads", fields: [capturedByUserId], references: [id])
+
+  /// Quelle der Erfassung, z. B. "mobile_app", "admin_manual"
+  source           String?
+
+  createdAt        DateTime  @default(now())
+
+  values           LeadValue[]
+
+  @@index([formId])
+  @@index([eventId])
+  @@index([capturedByUserId])
+}
+
+// --------------------------------------------------
+// LeadValue – einzelner Feldwert eines Leads
+// --------------------------------------------------
+
+model LeadValue {
+  id      Int       @id @default(autoincrement())
+  leadId  Int
+  lead    Lead      @relation(fields: [leadId], references: [id])
+
+  fieldId Int
+  field   FormField @relation(fields: [fieldId], references: [id])
+
+  /// Wert als String (Interpretation via FieldType)
+  value   String
+
+  @@index([leadId])
+  @@index([fieldId])
 }
