@@ -1,43 +1,49 @@
-// app/(admin)/admin/layout.tsx
-import type { ReactNode } from "react";
-import Link from "next/link";
+// web/app/(admin)/admin/layout.tsx
+import Link from 'next/link';
+import type { ReactNode } from 'react';
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+type AdminLayoutProps = {
+  children: ReactNode;
+};
+
+const navItems = [
+  { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/forms', label: 'Formulare' },
+  { href: '/admin/leads', label: 'Leads' },
+];
+
+export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="mt-2 flex gap-6">
-      {/* Sidebar */}
-      <aside className="w-56 shrink-0 rounded-lg border border-slate-200 bg-white p-4 text-sm">
-        <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Admin-Navigation
+    <div className="min-h-screen flex bg-slate-50 text-slate-900">
+      {/* Sidebar (Desktop) */}
+      <aside className="hidden md:flex md:flex-col w-64 border-r border-slate-200 bg-white">
+        <div className="h-14 flex items-center px-4 border-b border-slate-200">
+          <span className="font-semibold tracking-tight">LeadRadar Admin</span>
         </div>
-        <nav className="space-y-2">
-          <Link
-            href="/admin"
-            className="flex items-center justify-between rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            <span>Dashboard</span>
-            <span className="text-[10px] uppercase tracking-wide text-emerald-300">
-              leer
-            </span>
-          </Link>
 
-          {/* Platzhalter für zukünftige Menüpunkte */}
-          <div className="rounded-md px-3 py-2 text-slate-400">
-            Formbuilder
-            <span className="ml-1 text-[10px] uppercase tracking-wide">
-              coming soon
-            </span>
-          </div>
-          <div className="rounded-md px-3 py-2 text-slate-400">
-            Events &amp; Leads
-          </div>
+        <nav className="flex-1 p-3 space-y-1 text-sm">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="block rounded-md px-3 py-2 hover:bg-slate-100 transition-colors"
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
       </aside>
 
-      {/* Hauptbereich */}
-      <main className="flex-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6">
-        {children}
-      </main>
+      {/* Main-Bereich */}
+      <div className="flex-1 flex flex-col">
+        {/* Header (Mobile) */}
+        <header className="md:hidden h-14 flex items-center justify-between px-4 border-b border-slate-200 bg-white">
+          <span className="font-semibold">LeadRadar Admin</span>
+          {/* Optional: später Burger-Menu */}
+        </header>
+
+        <main className="flex-1 p-4 md:p-6">{children}</main>
+      </div>
     </div>
   );
 }
