@@ -1,178 +1,213 @@
-# LeadRadar2025f – Projekt-Overview
+# LeadRadar2025f – Projektübersicht
 
-## 1. Projektkontext
+SaaS-Lösung zur digitalen Leaderfassung auf Messen (Admin-Web-App, Backend-API, Mobile-App).
 
-LeadRadar ist eine SaaS-Lösung zur digitalen Leaderfassung auf Messen.  
-Kernbausteine:
-
-- **Admin-Web-App** für Formulare, Events, Leads und Auswertungen.
-- **Backend-API** (Next.js Route Handlers) auf Basis von Prisma & PostgreSQL.
-- **Mobile-App** (später), die Formulare nutzt, um Leads vor Ort zu erfassen.
-
-Dieses Dokument hält den Stand der wichtigsten Teilprojekte fest.
+- Admin-UI für Formulare, Felder, Leads & Auswertungen.
+- Backend-API (Next.js App Router + Prisma/PostgreSQL).
+- Mobile-App (separates Projekt) zur Lead-Erfassung auf dem Messestand.
 
 ---
 
-## 2. Technologie-Stack
+## Teilprojekt 1.1 – Projekt-Setup & Web-Basis
 
-- **Framework:** Next.js 16 (App Router) mit TypeScript
-- **UI / Styling:** React Server Components, Tailwind CSS
-- **ORM / DB:** Prisma ORM, PostgreSQL
-- **Build / Dev:** Turbopack / `npm run dev` im Ordner `web`
-- **Architektur:**
-  - Admin-UI unter `/admin/*`
-  - Admin-API unter `/api/admin/*`
-  - Gemeinsame DTOs in `web/lib/api-types.ts`
-  - Prisma-Client in `web/lib/prisma.ts` (global, Turbo-kompatibel)
+**Ziele:**
 
----
+- Next.js App-Router-Projekt im Ordner `web`.
+- TypeScript, ESLint, Prettier, Tailwind-Basis.
+- Prisma-Setup mit PostgreSQL-Verbindung.
+- Erste Basis-Seiten / Layout (Admin-Shell).
 
-## 3. Teilprojekte & aktueller Stand
+**Ergebnis:**
 
-### Stand nach Teilprojekt 1.1 – Projekt-Setup & Web-Basis
-
-- Next.js-16-App im Ordner `web` aufgesetzt.
-- Tailwind, ESLint/TS-Konfiguration eingerichtet.
-- Basis-Adminlayout unter `/admin` mit einfachen Kacheln.
-- Git-Repo & Grundstruktur für Doku (`docs/`) angelegt.
+- Projekt-Root: `C:\dev\leadradar2025f`.
+- Web-App: `C:\dev\leadradar2025f\web`.
+- `npm run dev` startet die Next-App auf `http://localhost:3000`.
+- Prisma-Konfiguration (`prisma/schema.prisma`) eingerichtet.
+- Erste DB-Migration via `npx prisma migrate dev`.
 
 ---
 
-### Stand nach Teilprojekt 1.2 – Datenmodell & Prisma-Schema (Forms & Leads)
+## Teilprojekt 1.2 – Datenmodell & Prisma-Schema (Forms & Leads)
 
-- Prisma-Schema mit Kern-Entities definiert:
-  - `Form`, `FormField`
-  - `Lead`, `LeadValue`
+**Ziele:**
+
+- Datenmodell für Formulare & Leads definieren.
+- Prisma-Modelle:
+  - `Form`
+  - `FormField`
+  - `Lead`
+  - `LeadValue`
   - `Event`
-  - `User`
-- Relationen:
-  - `Form` 1:n `FormField`
-  - `Form` 1:n `Lead`
-  - `Lead` 1:n `LeadValue`
-  - `Lead` – `Event`
-  - `Lead` – `User` (als `capturedBy`)
-- Seed-Script (`prisma/seed.cjs`) aufgesetzt, Testdaten einspielbar.
-- `npx prisma generate` und lokale Entwicklung verifiziert.
+  - `User` (für spätere Auth / Ownership).
+
+**Ergebnis:**
+
+- Prisma-Schema enthält alle nötigen Modelle und Relationen:
+  - Ein `Form` hat mehrere `FormField`s.
+  - Ein `Form` hat mehrere `Lead`s.
+  - Ein `Lead` hat mehrere `LeadValue`s.
+  - Optionaler Bezug zu `Event`.
+- Seed-Skript (`prisma/seed.cjs`) legt Testdaten an (z. B. Demo-Formular).
+- `node prisma/seed.cjs` läuft sauber durch.
 
 ---
 
-### Stand nach Teilprojekt 1.3 – API-Basis & Routing (Forms & Leads)
+## Teilprojekt 1.3 – API-Basis & Routing (Forms & Leads)
 
-- Admin-API-Endpunkte implementiert:
+**Ziele:**
 
-  - `GET /api/admin/forms`
-  - `GET /api/admin/forms/:id`
-  - `GET /api/admin/leads?formId=...`
+- REST-Endpoints auf Basis des App-Routers:
+  - `/api/admin/forms` (Listen, Details, ggf. CRUD).
+  - `/api/leads` (Lead-Erfassung von Mobile/Frontend).
+- DTO-Strukturen in `web/lib/api-types.ts`.
 
-- Admin-API-Client in `web/lib/admin-api-client.ts`:
-  - Gemeinsames `ApiResult<T>`-Pattern.
-  - Hilfsfunktionen wie `fetchForms`, `fetchFormById`, `fetchLeads`.
-- Healthcheck-Route:
-  - `GET /api/health` (Basis-Monitoring).
+**Ergebnis:**
 
----
-
-### Stand nach Teilprojekt 1.4 – Admin-UI: Forms & Leads (List & Detail)
-
-- Admin-UI-Seiten:
-
-  - `/admin/forms` – Formularliste mit Basisinfos.
-  - `/admin/forms/[id]` – Detailansicht (vorerst read-only).
-  - `/admin/leads` – Lead-Liste mit Formularfilter (erste Version).
-
-- Konsistentes Admin-Layout mit einfachen Navigationskacheln.
-- Integration des Admin-API-Clients in die UI.
+- `POST /api/leads` nimmt einen Request-Body mit:
+  - `formId`
+  - `values` (Key-Value-Objekt, Keys entsprechen `FormField.key`).
+- Server-seitige Validierung:
+  - Existenz des Formulars.
+  - Struktur der `values`.
+  - Pflichtfelder werden geprüft (abhängig vom FormField-Schema).
+- Lead-Persistenz:
+  - `Lead` + zugehörige `LeadValue`s werden korrekt angelegt.
+- Admin-API-Basis in `web/app/api/admin/*` geschaffen.
 
 ---
 
-### Stand nach Teilprojekt 2.1 – Admin-UI & API: Form-CRUD (Create/Edit/Delete & Status)
+## Teilprojekt 1.4 – Admin-UI: Forms & Leads (List & Detail)
 
-- Vollständiges Formular-CRUD:
+**Ziele:**
 
-  - `POST /api/admin/forms` – neues Formular anlegen.
-  - `PUT /api/admin/forms/:id` – Formular aktualisieren.
-  - `DELETE /api/admin/forms/:id` – Soft-Delete via Status `ARCHIVED`.
+- Admin-Frontend zur Verwaltung von Formularen und Leads.
+- Seitenstruktur unter `(admin)`:
 
-- UI-Updates:
+  - `/admin/forms` – Formularübersicht.
+  - `/admin/forms/[id]` – Formulardetail.
+  - `/admin/leads` – Leadliste.
 
-  - Formular-Erstellung und -Bearbeitung in der Admin-UI.
-  - Status-Steuerung (z. B. ACTIVE/ARCHIVED) über das UI.
+**Ergebnis:**
+
+- React/Next-Admin-Layout (z. B. Sidebar + Topbar) implementiert.
+- Anzeige der vorhandenen Formulare in einer Tabelle (Name, Status, Anzahl Leads, etc.).
+- Anzeige der vorhandenen Leads (Formular, Datum, Event, etc.).
+- Detailseiten mit Basisinformationen.
 
 ---
 
-### Stand nach Teilprojekt 2.2 – Admin-UI & API: FormFields-CRUD & Reihenfolge
+## Teilprojekt 2.1 – Admin-UI & API: Form-CRUD (Create/Edit/Delete & Status)
 
-- Neue Endpunkte:
+**Ziele:**
 
-  - `POST /api/admin/forms/:id/fields`
-  - `PUT /api/admin/forms/:id/fields/:fieldId`
-  - `DELETE /api/admin/forms/:id/fields/:fieldId`
-  - `POST /api/admin/forms/:id/fields/reorder`
+- Vollständiges Formular-Management:
+  - Anlegen, Bearbeiten, Löschen von Formularen.
+  - Status (z. B. ACTIVE/INACTIVE/ARCHIVED).
 
-- Logik:
+**Ergebnis:**
 
-  - Anlage, Bearbeitung, Löschung von `FormField`.
-  - Feldreihenfolge (`order`) steuerbar über Reorder-Endpoint.
-
+- API-Endpoints für Form-CRUD unter `/api/admin/forms`.
 - Admin-UI:
-
-  - `/admin/forms/[id]` erweitert zur kompletten Feldverwaltung.
-  - UI-Komponenten zur Anlage, Bearbeitung und Sortierung der Felder.
-
----
-
-### Stand nach Teilprojekt 2.3 – Leads-Export (CSV) & Dashboard-KPIs
-
-**Leads-Export (CSV):**
-
-- Neuer Endpoint: `GET /api/admin/leads/export`
-  - Optionaler Query-Parameter: `formId`.
-  - Response: `text/csv; charset=utf-8` mit `Content-Disposition: attachment`.
-- CSV-Format:
-  - Basis-Spalten:
-    - `Lead ID`
-    - `Form Name`
-    - `Event Name`
-    - `Captured By`
-    - `Captured By Email`
-    - `Created At` (ISO 8601)
-  - Für jedes `FormField`:
-    - eigene Spalte: `Label (key)`, z. B. `E-Mail (email)`.
-  - Pro Zeile ein Lead, fehlende Werte = leere Zelle.
-  - UTF-8 mit BOM (`\uFEFF`) für Excel-Kompatibilität.
-- CSV-Hilfsfunktion:
-  - `web/lib/csv.ts` mit `toCsv(headers, rows)`.
-
-**Admin-UI – Leads-Seite:**
-
-- `/admin/leads`:
-  - Formular-Filter (`formId`) per Dropdown.
-  - Tabelle mit Basisinformationen pro Lead.
-  - Button **„Leads als CSV exportieren“**:
-    - Export berücksichtigt den aktuellen Formular-Filter.
-    - Simpler `<a href="...">`-Download auf `/api/admin/leads/export[?formId=...]`.
-
-**Admin-Dashboard-KPIs**
-
-- `/admin` zeigt jetzt:
-
-  - **Gesamt-Leads** (`prisma.lead.count()`).
-  - **Leads letzte 7 Tage** (`createdAt >= now - 7 Tage`).
-  - **Leads heute** (`createdAt >= Start des heutigen Tages`).
-  - **Top-Formulare** nach Anzahl Leads (Top 3):
-    - Aggregation via `prisma.lead.groupBy({ by: ["formId"], _count: { _all: true } })`.
-    - Auflösung der `formId` zu Formularnamen.
-    - Liste mit Link auf `/admin/leads?formId=...`.
-
-- Leere States:
-
-  - Bei keinen Leads werden 0-Kennzahlen angezeigt.
-  - Bereich „Top-Formulare“ zeigt eine Hinweismeldung statt Tabelle.
+  - Formular-Create-Flow.
+  - Formular-Edit-Flow.
+  - Löschen mit Sicherheitsabfrage.
+- Status-Steuerung:
+  - Nur aktive Formulare werden in der Lead-Erfassung angeboten.
 
 ---
 
-## 4. Nächste sinnvolle Schritte
+## Teilprojekt 2.2 – Admin-UI & API: FormFields-CRUD & Reihenfolge
 
-- Anbindung von Events (Event-Auswahl in der Admin-UI, Filter).
-- Erste einfache Auswertungen nach Event / Zeitraum.
-- Vorbereitung der Mobile-App (Formular-Sync, Auth, Offline-Fähigkeit).
+**Ziele:**
+
+- Verwaltung von Formularfeldern je Formular:
+  - Anlegen, Bearbeiten, Löschen.
+  - Typen (Text, E-Mail, Nummer, Auswahl, etc.).
+  - Pflichtfeld-Flag.
+  - Sortier-Reihenfolge.
+
+**Ergebnis:**
+
+- API-Endpoints `/api/admin/forms/[id]/fields` für CRUD & Sortierung.
+- Admin-UI-Komponenten:
+  - `FormMetaSection` (Formular-Metadaten).
+  - `FormFieldsManager` (Feldliste, Reihenfolge, Edit-Dialog).
+- Reihenfolge der Felder wird in der DB gespeichert und in der Lead-Erfassung berücksichtigt.
+
+---
+
+## Teilprojekt 2.3 – Leads-Export (CSV) & Admin-Dashboard-KPIs
+
+**Ziele:**
+
+- CSV-Export aller Leads (optional gefiltert nach `formId`).
+- Dashboard-KPIs auf der Admin-Startseite.
+
+**Ergebnis:**
+
+- Neuer CSV-Helper `web/lib/csv.ts`:
+  - `toCsv(headers, rows)` inkl. sauberes Escaping + UTF-8-BOM für Excel.
+- Endpoint `GET /api/admin/leads/export`:
+  - Optionaler Query-Parameter `formId`.
+  - Liefert CSV-Inhalt (Content-Type `text/csv` + Download-Header).
+- Dashboard `/admin`:
+  - Gesamtanzahl Leads.
+  - Leads der letzten 7 Tage.
+  - Leads heute.
+  - Top-Formulare nach Anzahl Leads.
+
+---
+
+## Teilprojekt 4.1 – Sofort-Aktion: Danke-E-Mail & Innendienst-Mail nach Lead-Erfassung
+
+**Ziel:**  
+Nach jeder erfolgreichen Lead-Erfassung (egal ob Mobile-App oder Admin-UI) können automatisierte E-Mails als Sofortaktion ausgelöst werden:
+
+- Optional eine **Danke-Mail** an den Besucher (falls eine E-Mail-Adresse im Lead erfasst wurde).
+- Eine **Innendienst-Mail** an eine Sammeladresse (z. B. Verkauf / Backoffice).
+
+> **Status:**  
+> Der E-Mail-Flow ist aktuell als **MVP / technische Option** implementiert.  
+> Ob der finale Flow genau so genutzt wird oder später anders realisiert wird, ist noch offen.
+
+### Technische Umsetzung
+
+- Neues Modul `web/lib/mail.ts`:
+
+  - SMTP-Transport (Nodemailer) gemäss ENV-Konfiguration.
+  - `sendMail()` als Low-Level-Wrapper.
+  - `sendThankYouMail()` für Besucher-Dankemails.
+  - `sendLeadNotifyMail()` für Innendienst-Benachrichtigungen.
+  - `isMailEnabled()` als globaler Schalter (liest `MAIL_ENABLED`).
+
+- ENV-Variablen (in `.env` / `.env.example` dokumentiert):
+
+  - `MAIL_ENABLED` – `"true"` aktiviert den Versand, alles andere deaktiviert.
+  - `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_USER`, `MAIL_SMTP_PASS` – SMTP-Zugang.
+  - `MAIL_FROM` – Absenderadresse.
+  - `MAIL_LEADS_NOTIFY` – Sammeladresse für Innendienst.
+
+- Endpoint `POST /api/leads`:
+
+  - Persistiert weiterhin den Lead inkl. `LeadValue`s (bestehende Validierung bleibt).
+  - Nach erfolgreichem `prisma.lead.create(...)` wird `handleLeadMails(...)` aufgerufen.
+  - E-Mail-Fehler:
+    - werden geloggt,
+    - brechen den HTTP-Request **nicht** ab,
+    - werden im Response im Feld `mailStatus` zusammengefasst (`"disabled" | "ok" | "partial" | "error"`).
+
+### Business-Sicht
+
+- Besucher können unmittelbar eine Bestätigung und Wertschätzung nach dem Messekontakt erhalten.
+- Der Innendienst kann sofort eine strukturierte Übersicht des neuen Leads per E-Mail erhalten (inkl. Feldwerte), und priorisieren/nachfassen.
+- Der Mail-Versand ist über `MAIL_ENABLED` jederzeit pro Umgebung ein- oder ausschaltbar (z. B. lokal deaktiviert, Stage aktiv, Prod aktiv).
+- Da der Flow als MVP umgesetzt ist, kann die konkrete Ausprägung (Templates, Empfängerlogik, Triggerzeitpunkt) in späteren Teilprojekten noch angepasst werden.
+
+---
+
+## Nächste mögliche Teilprojekte
+
+- **4.2**: Per-Formular-E-Mail-Templates (eigene Texte & Betreffzeilen).
+- **4.3**: Mehrsprachige Mail-Templates (DE/EN).
+- **5.x**: Mobile-App-Integration (Form-Selection, Offline-Puffer, Sync).
+- **6.x**: Auswertungen & Reporting (Charts, Form-Performance, Conversion-Rates).
