@@ -1,163 +1,108 @@
 // web/app/(admin)/admin/forms/[id]/page.tsx
 import Link from 'next/link';
-import { apiGet } from '@/lib/admin-api-client';
-import type { FormDto, FormFieldDto } from '@/lib/api-types';
+import { fetchFormById } from '@/lib/admin-api-client';
+import type { FormDto } from '@/lib/api-types';
+import FormMetaEditor from './FormMetaEditor';
 
-type FormForDetail = FormDto & {
-  fields?: FormFieldDto[];
-  description?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-type FormDetailPageProps = {
+interface FormDetailPageProps {
   params: {
     id: string;
   };
-};
-
-function formatDateTime(value?: string) {
-  if (!value) return '–';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '–';
-
-  return date.toLocaleString('de-CH', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
-export default async function FormDetailPage({ params }: FormDetailPageProps) {
+export default async function FormDetailPage({
+  params,
+}: FormDetailPageProps) {
   const id = Number(params.id);
 
-  if (Number.isNaN(id)) {
+  if (!Number.isInteger(id) || id <= 0) {
     return (
-      <div className="space-y-4">
-        <Link
-          href="/admin/forms"
-          className="text-sm text-slate-600 hover:text-slate-900 hover:underline"
-        >
-          ← Zurück zur Formularübersicht
-        </Link>
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          Ungültige Formular-ID.
-        </div>
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-semibold">Formular</h1>
+        <p className="text-sm text-red-600">Ungültige Formular-ID.</p>
       </div>
     );
   }
 
-  const { data, error } = await apiGet<FormDto>(`/api/admin/forms/${id}`);
-  const form = (data as FormForDetail | null) ?? null;
+  const result = await fetchFormById(id);
 
-  if (error) {
+  if (!result.ok || !result.data) {
     return (
-      <div className="space-y-4">
-        <Link
-          href="/admin/forms"
-          className="text-sm text-slate-600 hover:text-slate-900 hover:underline"
-        >
-          ← Zurück zur Formularübersicht
-        </Link>
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </div>
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-semibold">Formular</h1>
+        <p className="text-sm text-red-600">
+          Fehler beim Laden des Formulars: {result.error ?? 'Unbekannter Fehler'}
+        </p>
+        <p className="mt-4 text-sm">
+          <Link href="/admin/forms" className="text-gray-900 underline">
+            Zur Formularübersicht
+          </Link>
+        </p>
       </div>
     );
   }
 
-  if (!form) {
-    return (
-      <div className="space-y-4">
-        <Link
-          href="/admin/forms"
-          className="text-sm text-slate-600 hover:text-slate-900 hover:underline"
-        >
-          ← Zurück zur Formularübersicht
-        </Link>
-        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-          Formular nicht gefunden.
-        </div>
-      </div>
-    );
-  }
-
-  const fields = (form.fields ?? []) as FormFieldDto[];
+  const form = result.data as FormDto;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <Link
-            href="/admin/forms"
-            className="text-sm text-slate-600 hover:text-slate-900 hover:underline"
-          >
-            ← Zurück zur Formularübersicht
-          </Link>
-
-          <div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-              {form.name}
-            </h1>
-            {form.description && (
-              <p className="mt-1 text-sm text-slate-600">{form.description}</p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-700">
-              Status: {form.status}
-            </span>
-            <span>Erstellt: {formatDateTime(form.createdAt)}</span>
-            <span>Zuletzt geändert: {formatDateTime(form.updatedAt)}</span>
-            <span>Felder: {Array.isArray(form.fields) ? form.fields.length : '–'}</span>
-          </div>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{form.name}</h1>
+          {form.description && (
+            <p className="mt-1 text-sm text-gray-600">
+              {form.description}
+            </p>
+          )}
         </div>
+        <span
+          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+            form.status === 'ACTIVE'
+              ? 'bg-green-100 text-green-800'
+              : form.status === 'ARCHIVED'
+              ? 'bg-gray-200 text-gray-700'
+              : 'bg-yellow-100 text-yellow-800'
+          }`}
+        >
+          {form.status}
+        </span>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Felder
-        </div>
+      <FormMetaEditor form={form} />
 
-        {fields.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-slate-600">
-            Dieses Formular hat noch keine Felder.
+      <div className="space-y-2">
+        <h2 className="text-sm font-semibold">Formfelder</h2>
+        {form.fields.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-4 text-xs text-gray-500">
+            Noch keine Felder definiert.  
+            Die Feldverwaltung folgt in einem separaten Teilprojekt.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border bg-white">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="border-b bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
                 <tr>
-                  <th className="px-4 py-2">Reihenfolge</th>
                   <th className="px-4 py-2">Label</th>
                   <th className="px-4 py-2">Key</th>
                   <th className="px-4 py-2">Typ</th>
-                  <th className="px-4 py-2">Pflichtfeld</th>
+                  <th className="px-4 py-2">Pflicht</th>
+                  <th className="px-4 py-2">Reihenfolge</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {fields.map((field, index) => (
-                  <tr key={field.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 text-sm text-slate-600">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-slate-900">
-                      {field.label}
-                    </td>
-                    <td className="px-4 py-2 text-xs font-mono text-slate-700">
+              <tbody className="divide-y">
+                {form.fields.map((field) => (
+                  <tr key={field.id}>
+                    <td className="px-4 py-2 text-sm">{field.label}</td>
+                    <td className="px-4 py-2 text-xs text-gray-600">
                       {field.key}
                     </td>
-                    <td className="px-4 py-2 text-xs">
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-700">
-                        {field.type}
-                      </span>
+                    <td className="px-4 py-2 text-xs text-gray-700">
+                      {field.type}
                     </td>
-                    <td className="px-4 py-2 text-sm">
+                    <td className="px-4 py-2 text-xs">
                       {field.required ? 'Ja' : 'Nein'}
                     </td>
+                    <td className="px-4 py-2 text-xs">{field.order}</td>
                   </tr>
                 ))}
               </tbody>
@@ -165,6 +110,12 @@ export default async function FormDetailPage({ params }: FormDetailPageProps) {
           </div>
         )}
       </div>
+
+      <p className="text-sm">
+        <Link href="/admin/forms" className="text-gray-900 underline">
+          Zur Formularübersicht
+        </Link>
+      </p>
     </div>
   );
 }

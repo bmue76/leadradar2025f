@@ -1,85 +1,67 @@
 // web/lib/api-types.ts
 
-/**
- * Gemeinsame API-Typen für LeadRadar
- * (nur zur Dokumentation / Typ-Sicherheit – kein Runtime-Code)
- */
+// Status eines Formulars im Admin
+export type FormStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
-export type FormFieldDto = {
+// Einzelnes Feld eines Formulars
+export interface FormFieldDto {
   id: number;
   formId: number;
   key: string;
   label: string;
   type: string;
   required: boolean;
-  position: number;
-  placeholder?: string | null;
-  options?: string[] | null;
-};
+  order: number;
+}
 
-export type FormDto = {
+// Formular inklusive Felder
+export interface FormDto {
   id: number;
   name: string;
-  description?: string | null;
-  status: string;
-  eventId?: number | null;
-  createdAt: string;
-  updatedAt: string;
+  description: string | null;
+  status: FormStatus;
+  fieldCount: number;
   fields: FormFieldDto[];
-};
-
-export type LeadValueDto = {
-  id: number;
-  leadId: number;
-  fieldId: number;
-  // kein fieldKey in der DB – kann man später über Join zu FormField holen
-  value: string;
-};
-
-export type LeadDto = {
-  id: number;
-  formId: number;
-  eventId?: number | null;
-  capturedByUserId?: number | null;
   createdAt: string;
   updatedAt: string;
-  form?: {
-    id: number;
-    name: string;
-  } | null;
-  event?: {
-    id: number;
-    name: string;
-  } | null;
-  values?: LeadValueDto[];
-};
+}
 
-export type LeadSummaryDto = {
+// Einzelner Lead-Wert in der Admin-Ansicht
+export interface LeadValueDto {
+  fieldId: number;
+  fieldKey: string;
+  label: string;
+  value: string | null;
+}
+
+// Zusammenfassung eines Leads für die Admin-Lead-Liste
+export interface LeadSummaryDto {
   id: number;
   formId: number;
-  eventId?: number | null;
-  capturedByUserId?: number | null;
+  formName: string;
   createdAt: string;
-  formName?: string | null;
-  eventName?: string | null;
-};
+  values: LeadValueDto[];
+}
 
-export type LeadCreateValueInput = {
-  fieldKey: string;
-  value: string;
-};
-
-export type LeadCreatePayload = {
+// Request-Body für POST /api/leads
+// values: key = FormField.key
+export interface CreateLeadRequest {
   formId: number;
-  eventId?: number;
-  capturedByUserId?: number;
-  values: LeadCreateValueInput[];
-};
+  values: Record<string, string | null>;
+}
 
-export type ErrorResponse = {
-  error: {
-    code: string;
-    message: string;
-    details?: any;
-  };
-};
+// Healthcheck-Response für GET /api/health
+export interface HealthStatusDto {
+  ok: boolean;
+  timestamp: string;
+  environment?: string;
+}
+
+// (Optional) Event-DTO – falls du Events schon nutzt oder später brauchst
+export interface EventDto {
+  id: number;
+  name: string;
+  description: string | null;
+  startDate: string;
+  endDate: string;
+}

@@ -1,186 +1,117 @@
-// web/app/api/leads/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import type {
-  LeadCreatePayload,
-  LeadCreateValueInput,
-  ErrorResponse,
-} from '@/lib/api-types';
+import type { CreateLeadRequest } from '@/lib/api-types';
+import type { Prisma } from '@prisma/client';
 
-function badRequest(code: string, message: string, details?: any) {
-  const body: ErrorResponse = {
-    error: { code, message, details },
-  };
-  return NextResponse.json(body, { status: 400 });
-}
-
+/**
+ * POST /api/leads
+ * Öffentlicher Endpoint zum Anlegen eines Leads.
+ *
+ * Erwarteter Body:
+ * {
+ *   "formId": 1,
+ *   "values": {
+ *     "firstName": "Beat",
+ *     "lastName": "Müller",
+ *     "email": "beat@example.com"
+ *   }
+ * }
+ *
+ * Werte werden über FormField.key aufgelöst.
+ */
 export async function POST(req: NextRequest) {
-  let payload: unknown;
-
   try {
-    payload = await req.json();
-  } catch {
-    return badRequest('BAD_REQUEST', 'Invalid JSON body');
-  }
+    const body = (await req.json().catch(() => null)) as CreateLeadRequest | null;
 
-  const body = payload as Partial<LeadCreatePayload>;
+    if (!body || typeof body !== 'object') {
+      return Response.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 },
+      );
+    }
 
-  // formId robust parsen (Zahl oder String)
-  const formIdRaw = (body as any)?.formId;
-  const formId = Number(formIdRaw);
+    const { formId, values } = body;
 
-  if (!Number.isFinite(formId)) {
-    return badRequest('BAD_REQUEST', 'formId is required and must be a number');
-  }
+    if (
+      typeof formId !== 'number' ||
+      !Number.isInteger(formId) ||
+      formId <= 0
+    ) {
+      return Response.json(
+        { error: 'Field "formId" must be a positive integer' },
+        { status: 400 },
+      );
+    }
 
-  if (!Array.isArray(body.values) || body.values.length === 0) {
-    return badRequest(
-      'VALIDATION_ERROR',
-      'values must be a non-empty array',
-    );
-  }
+    if (!values || typeof values !== 'object') {
+      return Response.json(
+        { error: 'Field "values" must be an object' },
+        { status: 400 },
+      );
+    }
 
-  // Values grob validieren
-  const values: LeadCreateValueInput[] = body.values.map((v) => ({
-    fieldKey: String((v as any).fieldKey ?? ''),
-    value: String((v as any).value ?? ''),
-  }));
-
-  if (values.some((v) => !v.fieldKey)) {
-    return badRequest(
-      'VALIDATION_ERROR',
-      'Each value must have a non-empty fieldKey',
-    );
-  }
-
-  try {
-    // Formular + Felder holen
     const form = await prisma.form.findUnique({
       where: { id: formId },
-      include: { fields: true },
+      include: {
+        fields: true,
+      },
     });
 
     if (!form) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'FORM_NOT_FOUND',
-            message: `Form with id ${formId} not found`,
-          },
-        },
+      return Response.json(
+        { error: 'Form not found' },
         { status: 404 },
       );
     }
 
-    // Map fieldKey -> FormField
-    const fieldByKey = new Map(
-      form.fields.map((field) => [field.key, field]),
-    );
-
-    // Unbekannte fieldKeys sammeln
-    const unknownFieldKeys = values
-      .filter((v) => !fieldByKey.has(v.fieldKey))
-      .map((v) => v.fieldKey);
-
-    if (unknownFieldKeys.length > 0) {
-      return badRequest(
-        'UNKNOWN_FIELD_KEY',
-        'One or more fieldKeys are not defined for this form',
-        { unknownFieldKeys },
+    if (form.status === 'ARCHIVED') {
+      return Response.json(
+        { error: 'Form is archived and cannot accept new leads' },
+        { status: 400 },
       );
     }
 
-    // Pflichtfelder prüfen
-    const missingRequired = form.fields
-      .filter((f) => f.required)
-      .filter((f) => {
-        const matching = values.find((v) => v.fieldKey === f.key);
-        return !matching || !matching.value || matching.value.trim().length === 0;
-      })
-      .map((f) => f.key);
+    // Unchecked-Variante, damit wir fieldId direkt setzen können.
+    const leadValuesData: Prisma.LeadValueUncheckedCreateWithoutLeadInput[] =
+      form.fields.map((field) => {
+        const rawValue = (values as Record<string, unknown>)[field.key];
 
-    if (missingRequired.length > 0) {
-      return badRequest(
-        'MISSING_REQUIRED_FIELD',
-        'One or more required fields are missing or empty',
-        { missingRequired },
-      );
-    }
+        let valueString: string;
+        if (rawValue == null) {
+          valueString = '';
+        } else if (typeof rawValue === 'string') {
+          valueString = rawValue;
+        } else {
+          valueString = String(rawValue);
+        }
 
-    // eventId & capturedByUserId optional parsen
-    const eventIdRaw = (body as any)?.eventId;
-    const eventId =
-      typeof eventIdRaw === 'number' || typeof eventIdRaw === 'string'
-        ? Number(eventIdRaw)
-        : undefined;
+        return {
+          fieldId: field.id,
+          value: valueString,
+        };
+      });
 
-    const capturedByUserIdRaw = (body as any)?.capturedByUserId;
-    const capturedByUserId =
-      typeof capturedByUserIdRaw === 'number' ||
-      typeof capturedByUserIdRaw === 'string'
-        ? Number(capturedByUserIdRaw)
-        : undefined;
-
-    // Lead + LeadValues anlegen (nested create)
     const lead = await prisma.lead.create({
       data: {
-        formId,
-        eventId: eventId ?? null,
-        capturedByUserId: capturedByUserId ?? null,
+        formId: form.id,
         values: {
-          create: values.map((v) => {
-            const field = fieldByKey.get(v.fieldKey)!;
-            return {
-              fieldId: field.id,
-              value: v.value,
-            };
-          }),
-        },
-      },
-      include: {
-        form: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        event: {
-          select: {
-            id: true,
-            name: true,
-          },
+          create: leadValuesData,
         },
       },
     });
 
-    return NextResponse.json(
+    return Response.json(
       {
-        lead: {
-          id: lead.id,
-          formId: lead.formId,
-          eventId: lead.eventId,
-          capturedByUserId: lead.capturedByUserId,
-          createdAt: lead.createdAt.toISOString(),
-          form: lead.form,
-          event: lead.event,
-        },
-        summary: {
-          fieldCount: values.length,
-          requiredFieldsMissing: 0,
-        },
+        id: lead.id,
+        formId: lead.formId,
+        createdAt: lead.createdAt.toISOString(),
       },
       { status: 201 },
     );
   } catch (error) {
-    console.error('POST /api/leads failed', error);
-
-    return NextResponse.json(
-      {
-        error: {
-          code: 'SERVER_ERROR',
-          message: 'Failed to create lead',
-        },
-      },
+    console.error('Error creating lead', error);
+    return Response.json(
+      { error: 'Failed to create lead' },
       { status: 500 },
     );
   }

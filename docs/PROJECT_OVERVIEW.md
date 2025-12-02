@@ -1,193 +1,188 @@
 # LeadRadar2025f – Projektübersicht
 
-SaaS-Lösung zur **digitalen Leaderfassung auf Messen**.  
-Kernidee: Formulare im Admin-Backend konfigurieren, an eine Mobile-App pushen und Leads vor Ort erfassen – inkl. späterem Export in CRM-Systeme.
+LeadRadar2025f ist ein SaaS-Projekt zur digitalen Leaderfassung auf Messen.  
+Kernbausteine:
+
+- **Admin-Web-App (Next.js / TypeScript / Tailwind)** zur Verwaltung von Events, Formularen und Leads.
+- **Backend-API (Next.js App Router + Prisma + PostgreSQL/SQLite)**.
+- **Mobile-App (separates Projekt)** zur Leaderfassung vor Ort (QR-/Visitenkartenscan etc.).
+
+Dieses Dokument fasst den Stand der bisherigen Teilprojekte zusammen.
 
 ---
 
-## 1. Architektur & Tech-Stack
+## Stand nach Teilprojekt 1.1 – Projekt-Setup & Web-Basis
 
-- **Monorepo**: `leadradar2025f`
-- **Web-Admin / Backend**
-  - Framework: **Next.js** (App Router, TypeScript)
-  - Styling: **Tailwind CSS v4**
-  - API: Route-Handler unter `/api/*`
-  - ORM: **Prisma** mit PostgreSQL (Modelle: Form, FormField, Lead, LeadValue, Event, User)
-- **Mobile-App**
-  - (Geplant / in separaten Teilprojekten): React Native / Expo
-  - Lädt Formulare & Events aus der API, erfasst Leads offline/online
+**Ziel:**
 
-Zentrales Prinzip: **Shared Types** zwischen API & Frontend in `web/lib/api-types.ts`, um eine konsistente Datenstruktur zu haben.
+- Grundgerüst für die Web-Applikation schaffen.
 
----
+**Umsetzung:**
 
-## 2. Bisherige Teilprojekte
-
-### 2.1 Teilprojekt 1.1 – Projekt-Setup & Web-Basis
-
-Ziele:
-- Next.js-App mit App Router & TypeScript im Ordner `web`.
-- Basis-Layout für die Admin-Shell.
-
-Umgesetzt:
-- Next.js + TypeScript + Tailwind v4 Grundsetup.
-- Admin-Bereich unter `app/(admin)/admin` angelegt.
-- Layout-Struktur mit Sidebar/Header definiert.
-- Erste Navigation zum Admin-Dashboard (`/admin`).
+- Next.js (App Router, TypeScript, Tailwind v4) unter `web/`.
+- Basis-Layout mit Admin-Shell:
+  - Admin-Bereich unter `/admin`.
+  - Sidebar-Navigation (Dashboard, Formulare, Leads).
+- Technische Basis:
+  - ESLint / TypeScript-Konfiguration.
+  - Tailwind v4 Setup.
+  - Erste simple Seiten / Routen.
 
 ---
 
-### 2.2 Teilprojekt 1.2 – Datenmodell & Prisma-Schema (Forms & Leads)
+## Stand nach Teilprojekt 1.2 – Datenmodell & Prisma-Schema (Forms & Leads)
 
-Ziele:
-- Abbildung des Kern-Domainmodells: Events, Formulare, Felder, Leads & Lead-Werte.
-- Prisma-Schema und Migrationen lauffähig machen.
+**Ziel:**
 
-Umgesetzt:
-- Prisma-Schema mit den Kernmodellen:
-  - **Form, FormField**
-  - **Lead, LeadValue**
-  - **Event, User**
-- Enums:
-  - **FormStatus** (z. B. DRAFT, ACTIVE, ARCHIVED)
-  - **FieldType** (z. B. TEXT, EMAIL, SELECT, CHECKBOX, …)
-- Migration & Seed:
-  - `node prisma/seed.cjs` läuft durch.
-  - Demo-Formular + Felder + Demo-Daten werden angelegt.
+- Datenmodell für Formulare und Leads definieren.
 
-Resultat:
-- Datenbank-Grundlage für Formulare, Felder und Leads steht.
-- Seed stellt sicher, dass direkt ein erstes Formular verfügbar ist.
+**Kern-Entitäten (Prisma-Schema):**
 
----
+- `Form`
+  - `id`, `name`, `description`, `status` (`DRAFT`, `ACTIVE`, `ARCHIVED`)
+  - Beziehungen: `fields`, `leads`
+- `FormField`
+  - `id`, `formId`, `key`, `label`, `type`, `required`, `order`
+- `Lead`
+  - `id`, `formId`, `createdAt`
+  - Beziehung: `values`
+- `LeadValue`
+  - `id`, `leadId`, `fieldId`, `value`
+- `Event`, `User` (Basis für spätere Erweiterungen).
 
-### 2.3 Teilprojekt 1.3 – API-Basis & Routing (Forms & Leads)
+**Prisma-Basis:**
 
-Ziele:
-- Erste stabile HTTP-API-Schicht aufbauen, um:
-  - Im Admin-Frontend Formulare & Leads lesen zu können.
-  - In der Mobile-App Formulare zu laden und Leads zu erfassen.
-- Healthcheck für App & Datenbank.
-
-Umgesetzt:
-- Gemeinsame API-Typen in `web/lib/api-types.ts`:
-  - `FormFieldDto`, `FormDto`
-  - `LeadValueDto`, `LeadDto`, `LeadSummaryDto`
-  - `LeadCreateValueInput`, `LeadCreatePayload`
-  - `ErrorResponse`
-- Endpoints (alle getestet unter `npm run dev`):
-  - `GET /api/health`
-  - `GET /api/admin/forms`
-  - `GET /api/admin/forms/:id`
-  - `GET /api/admin/leads?formId=...`
-  - `POST /api/leads` (Lead-Erfassung aus der Mobile-App)
-- Typisierte Responses auf Basis der oben genannten DTOs.
-
-Resultat:
-- API-Schicht ist funktional, die wichtigsten Lese- und Schreibpfade sind vorhanden.
-- Die Endpoints können direkt von Admin-UI und Mobile-App genutzt werden.
+- `prisma/schema.prisma` mit obigen Modellen.
+- `prisma/seed.cjs` legt ein Beispiel-Formular mit Feldern an.
+- `npx prisma generate` und `node prisma/seed.cjs` laufen durch.
 
 ---
 
-### 2.4 Stand nach Teilprojekt 1.4 – Admin-UI: Forms & Leads (List & Detail)
+## Stand nach Teilprojekt 1.3 – API-Basis & Routing
 
-Ziele:
-- Erste nutzbare Admin-Oberfläche für:
-  - Formular-Liste & Formular-Details
-  - Lead-Liste mit optionalem Formular-Filter
-- Fokus auf **Read-Only**, klares Layout, sauberes Error-/Empty-State-Handling.
+**Ziel:**
 
-Umgesetzt:
+- Erste API-Endpunkte für Admin und Public.
 
-**Routing & Struktur**
+**Admin-API:**
 
-- `web/app/(admin)/admin/layout.tsx`
-  - Sidebar-Navigation mit Links:
-    - Dashboard (`/admin`)
-    - Formulare (`/admin/forms`)
-    - Leads (`/admin/leads`)
-  - Konsistentes Layout mit Sidebar (Desktop) und einfachem Header (Mobile).
+- `GET /api/admin/forms`
+- `GET /api/admin/forms/:id`
+- `GET /api/admin/leads?formId=…`
 
-- `web/app/(admin)/admin/page.tsx`
-  - Einfaches Admin-Dashboard mit Kacheln zu:
-    - **Formulare**
-    - **Leads**
+**Public-API:**
 
-**Forms-UI**
+- `POST /api/leads`  
+  → legt einen Lead zu einem Formular an.
 
-- `web/app/(admin)/admin/forms/page.tsx`
-  - Lädt Formulare via `GET /api/admin/forms`.
-  - Zeigt Tabelle mit:
-    - Name (mit Link auf Detailansicht)
-    - Status
-    - Anzahl Felder (falls im DTO enthalten oder via `fields.length`)
-    - `createdAt` als Datum (de-CH Format)
-  - Empty-State: „Noch keine Formulare vorhanden.“
-  - Fehlerzustand: rote Fehlermeldung bei API-Problemen.
+**Sonstiges:**
 
-- `web/app/(admin)/admin/forms/[id]/page.tsx`
-  - Lädt ein einzelnes Formular via `GET /api/admin/forms/:id`.
-  - Kopfbereich mit:
-    - Name, Beschreibung
-    - Status
-    - Erstell- und Änderungsdatum
-    - Anzahl Felder
-  - Darunter eine Tabelle der Felder:
-    - Reihenfolge (1, 2, 3, … entsprechend der gelieferten Feldliste)
-    - Label
-    - Key
-    - Typ (`FieldType`)
-    - Pflichtfeld (Ja/Nein)
-  - Empty-State, falls ein Formular (noch) keine Felder hat.
-  - Fehlermeldungen bei ungültiger ID oder API-Fehlern.
-
-**Leads-UI**
-
-- `web/app/(admin)/admin/leads/page.tsx`
-  - Lädt Leads via:
-    - `GET /api/admin/leads` oder
-    - `GET /api/admin/leads?formId=...` (wenn Filter aktiv).
-  - Lädt zusätzlich Formulare via `GET /api/admin/forms` für den Filter.
-  - Zeigt Tabelle mit:
-    - **Lead-ID** (z. B. `#1`, monospace)
-    - **Formularname**
-    - **Eventname**
-    - **Erfassungsdatum/-zeit**
-  - Empty-State: „Noch keine Leads vorhanden.“
-  - Fehlerzustand: rote Fehlermeldung auf Basis der API-Fehlerantwort.
-
-- `web/app/(admin)/admin/leads/LeadFormFilter.tsx`
-  - Client-Komponente mit Dropdown:
-    - „Alle Formulare“ oder spezifisches Formular.
-  - Aktualisiert `formId` in der URL (`/admin/leads?formId=...`) via Router.
-  - Nutzt `useTransition` für sanftere Navigation.
-
-**Shared Helper**
-
-- `web/lib/admin-api-client.ts`
-  - `apiGet<T>(path)`: Wrapper um `fetch()` mit:
-    - Fallback-Basis-URL `http://localhost:3000`
-    - Auswertung des Fehler-JSONs (z. B. `message` oder `error`-Feld), um lesbare Fehlermeldungen zu erzeugen.
-    - Einheitliches `ApiResult<T>`-Format (`{ data, error }`).
-
-Resultat:
-- Admin-UI kann:
-  - Formulare (Liste & Detail) anzeigen.
-  - Leads anzeigen und optional nach Formular filtern.
-- Alle Views sind **Read-Only**, klar strukturiert und robust gegen Fehler/Empty-States.
+- `GET /api/health` als Healthcheck.
+- Gemeinsame DTOs unter `web/lib/api-types.ts`.
+- API-Client `web/lib/admin-api-client.ts` mit `apiGet` etc. für den Admin-Bereich.
 
 ---
 
-## 3. Nächste sinnvolle Schritte
+## Stand nach Teilprojekt 1.4 – Admin-UI: Forms & Leads (List & Detail)
 
-- **Teilprojekt 1.5 – Admin-UI: Events & Leads-Detail**
-  - Event-Verwaltung (Liste & Detail) im Admin.
-  - Optionale Lead-Detail-Ansicht mit allen Feldwerten.
+**Ziel:**
 
-- **Teilprojekt 2.x – Auth & Zugriffskontrolle**
-  - Härtung der API mit Auth-Zwischenschicht.
-  - Rollen-/Rechte-System für Admin-User.
+- Erste nutzbare Admin-Oberfläche:
 
-- **Teilprojekt 3.x – Formbuilder**
-  - Visueller Formbuilder mit Drag & Drop.
-  - Verbindung zur bestehenden Form-/Lead-Struktur und Mobile-App.
+  - Formular-Liste & Formular-Details (Read-Only).
+  - Lead-Liste mit Formular-Filter (Read-Only).
+
+**Umsetzung:**
+
+- `/admin`:
+  - Dashboard mit Kacheln zu „Formulare“ und „Leads“.
+- `/admin/forms`:
+  - Liste aller Formulare (Name, Status, Anzahl Felder, Erstelldatum).
+  - Link zu den Detailansichten.
+- `/admin/forms/[id]`:
+  - Detailansicht eines Formulars.
+  - Anzeige der zugehörigen Felder (Read-Only).
+- `/admin/leads`:
+  - Lead-Liste mit optionalem Formular-Filter (Chips/Tabs).
+  - Anzeige von Datum, Formularname und einem Auszug der wichtigsten Lead-Werte.
+
+**Technik:**
+
+- Server Components mit `fetchForms` / `fetchFormById` / `fetchLeads` (Admin-API).
+- Basic Error-/Empty-States in den Admin-Seiten.
+
+---
+
+## Stand nach Teilprojekt 2.1 – Admin-UI & API: Form-CRUD (Create/Edit/Delete & Status)
+
+**Ziel:**
+
+- Formularverwaltung im Admin voll funktionsfähig machen:
+  - Formulare anlegen,
+  - Metadaten bearbeiten (Name, Beschreibung, Status),
+  - Formulare archivieren (Soft-Delete).
+
+**API-Erweiterungen:**
+
+- `POST /api/admin/forms`
+  - Body: `{ name, description?, status? }`
+  - Legt ein neues Formular an.
+  - Default-Status: `DRAFT`, falls kein Status angegeben ist.
+- `PUT /api/admin/forms/:id`
+  - Body: `{ name?, description?, status? }`
+  - Partielle Updates von Name, Beschreibung und Status.
+- `DELETE /api/admin/forms/:id`
+  - Soft-Delete: setzt Status auf `ARCHIVED`.
+  - Antwort: `204 No Content` bei Erfolg.
+
+**Admin-UI-Erweiterungen:**
+
+- `/admin/forms`:
+  - Button **„Neues Formular“**:
+    - Öffnet ein Inline-Panel zum Anlegen eines neuen Formulars.
+    - Felder: Name (Pflicht), Beschreibung, Status (DRAFT/ACTIVE/ARCHIVED).
+    - Nach Erfolg: automatische Aktualisierung der Formularliste.
+  - Formularliste mit Aktionen:
+    - Name verlinkt auf `/admin/forms/[id]`.
+    - Spalte „Aktionen“ mit:
+      - **„Bearbeiten“** (Link auf Detailseite).
+      - **„Archivieren“** (Button, der `DELETE /api/admin/forms/:id` aufruft).
+- `/admin/forms/[id]`:
+  - Edit-Bereich für Metadaten:
+    - Name, Beschreibung, Status (Select).
+    - Button **„Änderungen speichern“** (PUT-Call).
+    - Button **„Formular archivieren“** (DELETE-Call, Bestätigung + Redirect zurück zur Liste).
+  - Darunter weiterhin die **Feldliste** (Read-Only), um die Struktur des Formulars zu sehen.
+
+**Technik / Pattern:**
+
+- **API:**
+  - Implementierung der CRUD-Endpunkte in:
+    - `web/app/api/admin/forms/route.ts` (GET, POST),
+    - `web/app/api/admin/forms/[id]/route.ts` (GET, PUT, DELETE).
+  - Nutzung von `prisma` aus `web/lib/prisma.ts` (PrismaClient via `require`, globale Instanz für Dev-Hot-Reload).
+  - DTO-Mapping → `FormDto` / `FormFieldDto` in `web/lib/api-types.ts`.
+
+- **Admin-UI:**
+  - Server Components für die Seiten (`/admin/forms`, `/admin/forms/[id]`).
+  - Kleine **Client-Komponenten** für interaktiven CRUD:
+    - `FormCreateButton.tsx` (Create-Flow).
+    - `ArchiveFormButton.tsx` (Archivieren aus der Liste).
+    - `FormMetaEditor.tsx` (Edit & Archivieren aus der Detailansicht).
+  - Verwendung des gemeinsamen Admin-API-Clients:
+    - `createForm`, `updateForm`, `archiveForm`, `fetchForms`, `fetchFormById`.
+  - Nach erfolgreichen Änderungen:
+    - `router.refresh()` (Liste bzw. Detail neu laden),
+    - bei Archivierung im Detail: `router.push('/admin/forms')`.
+
+**Business-Sicht:**
+
+- Admin kann jetzt:
+
+  - Neue Formulare anlegen (inkl. Status).
+  - Bestehende Formulare umbenennen, beschreiben und deren Status ändern.
+  - Formulare **archivieren**, sodass sie nicht mehr für neue Leads verwendet werden.
+
+- Formfelder bleiben in diesem Stand **Read-Only** – die eigentliche Feldverwaltung folgt als eigenes Teilprojekt.
+
+---

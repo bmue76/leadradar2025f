@@ -1,103 +1,123 @@
 // web/app/(admin)/admin/leads/page.tsx
-import { apiGet } from '@/lib/admin-api-client';
+import Link from 'next/link';
+import { fetchLeads, fetchForms } from '@/lib/admin-api-client';
 import type { LeadSummaryDto, FormDto } from '@/lib/api-types';
-import { LeadFormFilter } from './LeadFormFilter';
 
-type LeadsPageProps = {
-  searchParams?: {
-    formId?: string;
-  };
-};
+type LeadsSearchParams = Promise<{
+  formId?: string;
+}>;
 
-type LeadForList = LeadSummaryDto & {
-  formName?: string;
-  eventName?: string | null;
-  createdAt?: string;
-};
-
-function formatDateTime(value?: string) {
-  if (!value) return '–';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '–';
-
-  return date.toLocaleString('de-CH', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+interface LeadsPageProps {
+  searchParams: LeadsSearchParams;
 }
 
 export default async function LeadsPage({ searchParams }: LeadsPageProps) {
-  const formIdParam = searchParams?.formId;
+  const resolved = await searchParams;
+  const formIdParam = resolved?.formId;
   const formId = formIdParam ? Number(formIdParam) : undefined;
 
-  const leadsPath = formId
-    ? `/api/admin/leads?formId=${formId}`
-    : '/api/admin/leads';
+  const [leadsResult, formsResult] = await Promise.all([
+    fetchLeads(formId ? { formId } : undefined),
+    fetchForms(),
+  ]);
 
-  const { data: leadsData, error } = await apiGet<LeadSummaryDto[]>(leadsPath);
-  const leads: LeadForList[] = Array.isArray(leadsData)
-    ? (leadsData as LeadForList[])
-    : [];
+  if (
+    !leadsResult.ok ||
+    !formsResult.ok ||
+    !leadsResult.data ||
+    !formsResult.data
+  ) {
+    const errorMessage =
+      leadsResult.error ||
+      formsResult.error ||
+      'Fehler beim Laden der Leads oder Formulare';
 
-  // Forms für Dropdown (Fehler hier ist nicht kritisch – dann ist der Filter einfach leer/disabled)
-  const { data: formsData } = await apiGet<FormDto[]>('/api/admin/forms');
-  const forms: FormDto[] = Array.isArray(formsData)
-    ? (formsData as FormDto[])
-    : [];
+    return (
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-semibold">Leads</h1>
+        <p className="text-sm text-red-600">{errorMessage}</p>
+      </div>
+    );
+  }
+
+  const leads = (leadsResult.data.leads ?? []) as LeadSummaryDto[];
+  const forms = (formsResult.data.forms || []) as FormDto[];
+
+  const activeForm = formId
+    ? forms.find((form) => form.id === formId)
+    : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Übersicht der erfassten Leads. Optional gefiltert nach Formular.
-          </p>
-        </div>
-
-        <LeadFormFilter forms={forms} currentFormId={formId} />
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Leads</h1>
       </div>
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </div>
-      )}
+      {/* Filter nach Formular */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-600">Filtern nach Formular:</span>
+        <Link
+          href="/admin/leads"
+          className={`rounded-full border px-3 py-1 text-sm ${
+            !activeForm ? 'bg-gray-900 text-white' : 'bg-white'
+          }`}
+        >
+          Alle
+        </Link>
+        {forms.map((form) => (
+          <Link
+            key={form.id}
+            href={`/admin/leads?formId=${form.id}`}
+            className={`rounded-full border px-3 py-1 text-sm ${
+              activeForm?.id === form.id ? 'bg-gray-900 text-white' : 'bg-white'
+            }`}
+          >
+            {form.name}
+          </Link>
+        ))}
+      </div>
 
-      {!error && leads.length === 0 && (
-        <div className="rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-          Noch keine Leads vorhanden.
+      {/* Liste der Leads */}
+      {leads.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-sm text-gray-500">
+          Keine Leads gefunden
+          {activeForm ? ` für Formular „${activeForm.name}“` : ''}.
         </div>
-      )}
-
-      {!error && leads.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      ) : (
+        <div className="overflow-x-auto rounded-lg border bg-white">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <thead className="border-b bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
               <tr>
-                <th className="px-4 py-2">Lead-ID</th>
+                <th className="px-4 py-2">Datum</th>
                 <th className="px-4 py-2">Formular</th>
-                <th className="px-4 py-2">Event</th>
-                <th className="px-4 py-2">Erfasst am</th>
+                <th className="px-4 py-2">Werte (Auszug)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y">
               {leads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 text-xs font-mono text-slate-800">
-                    #{lead.id}
+                <tr key={lead.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 align-top text-xs text-gray-600">
+                    {new Date(lead.createdAt).toLocaleString()}
                   </td>
-                  <td className="px-4 py-2 text-sm text-slate-900">
-                    {lead.formName ?? '–'}
+                  <td className="px-4 py-2 align-top text-sm">
+                    {lead.formName}
                   </td>
-                  <td className="px-4 py-2 text-sm text-slate-700">
-                    {lead.eventName ?? '–'}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-slate-600">
-                    {formatDateTime(lead.createdAt)}
+                  <td className="px-4 py-2 align-top text-xs text-gray-700">
+                    {lead.values.length === 0 ? (
+                      <span className="text-gray-400">Keine Werte</span>
+                    ) : (
+                      <ul className="space-y-1">
+                        {lead.values.slice(0, 3).map((v) => (
+                          <li key={v.fieldId}>
+                            <span className="font-medium">{v.label}: </span>
+                            <span>{v.value ?? '—'}</span>
+                          </li>
+                        ))}
+                        {lead.values.length > 3 && (
+                          <li className="text-gray-400">… weitere Felder</li>
+                        )}
+                      </ul>
+                    )}
                   </td>
                 </tr>
               ))}

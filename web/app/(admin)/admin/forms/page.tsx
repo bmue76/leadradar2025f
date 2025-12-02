@@ -1,97 +1,102 @@
 // web/app/(admin)/admin/forms/page.tsx
 import Link from 'next/link';
-import { apiGet } from '@/lib/admin-api-client';
-import type { FormDto, FormFieldDto } from '@/lib/api-types';
-
-type FormForList = FormDto & {
-  fields?: FormFieldDto[];
-  createdAt?: string;
-};
-
-function formatDate(value?: string) {
-  if (!value) return '–';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '–';
-
-  return date.toLocaleDateString('de-CH', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
+import { fetchForms } from '@/lib/admin-api-client';
+import type { FormDto } from '@/lib/api-types';
+import FormCreateButton from './FormCreateButton';
+import ArchiveFormButton from './ArchiveFormButton';
 
 export default async function AdminFormsPage() {
-  const { data, error } = await apiGet<FormDto[]>('/api/admin/forms');
-  const forms: FormForList[] = Array.isArray(data) ? (data as FormForList[]) : [];
+  const result = await fetchForms();
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Formulare</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Übersicht aller Formulare, die in der Mobile-App für die Leaderfassung
-          verwendet werden.
+  if (!result.ok || !result.data) {
+    return (
+      <div className="p-6">
+        <h1 className="mb-4 text-2xl font-semibold">Formulare</h1>
+        <p className="text-sm text-red-600">
+          Fehler beim Laden der Formulare: {result.error ?? 'Unbekannter Fehler'}
         </p>
       </div>
+    );
+  }
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+  const forms = (result.data.forms ?? []) as FormDto[];
+
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Formulare</h1>
+        <FormCreateButton />
+      </div>
+
+      {forms.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-sm text-gray-500">
+          Noch keine Formulare vorhanden. Lege das erste Formular über
+          &nbsp;
+          <span className="font-medium">„Neues Formular“</span> an.
         </div>
-      )}
-
-      {!error && forms.length === 0 && (
-        <div className="rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
-          Noch keine Formulare vorhanden.
-        </div>
-      )}
-
-      {!error && forms.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      ) : (
+        <div className="overflow-x-auto rounded-lg border bg-white">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <thead className="border-b bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
               <tr>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Anzahl Felder</th>
-                <th className="px-4 py-2">Erstellt am</th>
+                <th className="px-4 py-2">Felder</th>
+                <th className="px-4 py-2">Erstellt</th>
+                <th className="px-4 py-2 text-right">Aktionen</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {forms.map((form) => {
-                const fieldCount = Array.isArray(form.fields)
-                  ? form.fields.length
-                  : undefined;
-
-                return (
-                  <tr key={form.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 align-top">
+            <tbody className="divide-y">
+              {forms.map((form) => (
+                <tr key={form.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 align-top">
+                    <Link
+                      href={`/admin/forms/${form.id}`}
+                      className="text-sm font-medium text-gray-900 hover:underline"
+                    >
+                      {form.name}
+                    </Link>
+                    {form.description && (
+                      <div className="mt-0.5 text-xs text-gray-500">
+                        {form.description}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 align-top">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        form.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-800'
+                          : form.status === 'ARCHIVED'
+                          ? 'bg-gray-200 text-gray-700'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      {form.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 align-top text-sm text-gray-700">
+                    {form.fieldCount}
+                  </td>
+                  <td className="px-4 py-2 align-top text-xs text-gray-600">
+                    {new Date(form.createdAt).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 align-top">
+                    <div className="flex justify-end gap-2">
                       <Link
                         href={`/admin/forms/${form.id}`}
-                        className="font-medium text-slate-900 hover:underline"
+                        className="rounded-md border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                       >
-                        {form.name}
+                        Bearbeiten
                       </Link>
-                      {form.description && (
-                        <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">
-                          {form.description}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 align-top text-xs">
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-700">
-                        {form.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 align-top text-sm">
-                      {typeof fieldCount === 'number' ? fieldCount : '–'}
-                    </td>
-                    <td className="px-4 py-2 align-top text-sm text-slate-600">
-                      {formatDate(form.createdAt)}
-                    </td>
-                  </tr>
-                );
-              })}
+                      <ArchiveFormButton
+                        formId={form.id}
+                        disabled={form.status === 'ARCHIVED'}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
