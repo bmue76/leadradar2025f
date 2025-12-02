@@ -1,123 +1,143 @@
-// web/app/(admin)/admin/leads/page.tsx
-import Link from 'next/link';
-import { fetchLeads, fetchForms } from '@/lib/admin-api-client';
-import type { LeadSummaryDto, FormDto } from '@/lib/api-types';
+import { prisma } from "@/lib/prisma";
 
-type LeadsSearchParams = Promise<{
-  formId?: string;
-}>;
+type LeadsPageProps = {
+  searchParams?: {
+    formId?: string;
+  };
+};
 
-interface LeadsPageProps {
-  searchParams: LeadsSearchParams;
-}
+export const dynamic = "force-dynamic";
 
 export default async function LeadsPage({ searchParams }: LeadsPageProps) {
-  const resolved = await searchParams;
-  const formIdParam = resolved?.formId;
-  const formId = formIdParam ? Number(formIdParam) : undefined;
+  const rawFormId = searchParams?.formId;
+  const parsedFormId = rawFormId ? Number(rawFormId) : undefined;
+  const formId =
+    parsedFormId && Number.isInteger(parsedFormId) && parsedFormId > 0
+      ? parsedFormId
+      : undefined;
 
-  const [leadsResult, formsResult] = await Promise.all([
-    fetchLeads(formId ? { formId } : undefined),
-    fetchForms(),
+  const [forms, leads] = await Promise.all([
+    prisma.form.findMany({
+      where: {
+        // ARCHIVED-Formulare im Filter ausblenden
+        status: {
+          not: "ARCHIVED",
+        },
+      },
+      orderBy: {
+        name: "asc",
+      },
+    }),
+    prisma.lead.findMany({
+      where: formId ? { formId } : {},
+      include: {
+        form: true,
+        event: true,
+        capturedBy: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    }),
   ]);
 
-  if (
-    !leadsResult.ok ||
-    !formsResult.ok ||
-    !leadsResult.data ||
-    !formsResult.data
-  ) {
-    const errorMessage =
-      leadsResult.error ||
-      formsResult.error ||
-      'Fehler beim Laden der Leads oder Formulare';
-
-    return (
-      <div className="p-6">
-        <h1 className="mb-4 text-2xl font-semibold">Leads</h1>
-        <p className="text-sm text-red-600">{errorMessage}</p>
-      </div>
-    );
-  }
-
-  const leads = (leadsResult.data.leads ?? []) as LeadSummaryDto[];
-  const forms = (formsResult.data.forms || []) as FormDto[];
-
-  const activeForm = formId
-    ? forms.find((form) => form.id === formId)
-    : undefined;
+  const exportUrl = formId
+    ? `/api/admin/leads/export?formId=${encodeURIComponent(String(formId))}`
+    : "/api/admin/leads/export";
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Leads</h1>
-      </div>
+    <div className="space-y-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+          <p className="text-sm text-gray-500">
+            Übersicht aller erfassten Leads. Über den Filter kannst du nach
+            Formular einschränken.
+          </p>
+        </div>
 
-      {/* Filter nach Formular */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-600">Filtern nach Formular:</span>
-        <Link
-          href="/admin/leads"
-          className={`rounded-full border px-3 py-1 text-sm ${
-            !activeForm ? 'bg-gray-900 text-white' : 'bg-white'
-          }`}
-        >
-          Alle
-        </Link>
-        {forms.map((form) => (
-          <Link
-            key={form.id}
-            href={`/admin/leads?formId=${form.id}`}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              activeForm?.id === form.id ? 'bg-gray-900 text-white' : 'bg-white'
-            }`}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <form
+            className="flex items-center gap-2"
+            action="/admin/leads"
+            method="get"
           >
-            {form.name}
-          </Link>
-        ))}
+            <label className="text-sm text-gray-700" htmlFor="formId">
+              Formular:
+            </label>
+            <select
+              id="formId"
+              name="formId"
+              defaultValue={rawFormId ?? ""}
+              className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm"
+            >
+              <option value="">Alle Formulare</option>
+              {forms.map((form) => (
+                <option key={form.id} value={form.id}>
+                  {form.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center rounded-md border border-gray-300 bg-gray-50 px-3 text-sm font-medium hover:bg-gray-100"
+            >
+              Filtern
+            </button>
+          </form>
+
+          <a
+            href={exportUrl}
+            className="inline-flex h-9 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium shadow-sm hover:bg-gray-50"
+          >
+            Leads als CSV exportieren
+          </a>
+        </div>
       </div>
 
-      {/* Liste der Leads */}
       {leads.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-6 text-sm text-gray-500">
-          Keine Leads gefunden
-          {activeForm ? ` für Formular „${activeForm.name}“` : ''}.
+        <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500">
+          Noch keine Leads erfasst.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+        <div className="overflow-x-auto rounded-md border">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2">Datum</th>
-                <th className="px-4 py-2">Formular</th>
-                <th className="px-4 py-2">Werte (Auszug)</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700">
+                  Erfasst am
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700">
+                  Formular
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700">
+                  Event
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700">
+                  Erfasst von
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100 bg-white">
               {leads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 align-top text-xs text-gray-600">
-                    {new Date(lead.createdAt).toLocaleString()}
+                <tr key={lead.id}>
+                  <td className="whitespace-nowrap px-3 py-2 align-top">
+                    {lead.createdAt.toLocaleString("de-CH")}
                   </td>
-                  <td className="px-4 py-2 align-top text-sm">
-                    {lead.formName}
+                  <td className="px-3 py-2 align-top">
+                    {lead.form?.name ?? `Formular #${lead.formId}`}
                   </td>
-                  <td className="px-4 py-2 align-top text-xs text-gray-700">
-                    {lead.values.length === 0 ? (
-                      <span className="text-gray-400">Keine Werte</span>
-                    ) : (
-                      <ul className="space-y-1">
-                        {lead.values.slice(0, 3).map((v) => (
-                          <li key={v.fieldId}>
-                            <span className="font-medium">{v.label}: </span>
-                            <span>{v.value ?? '—'}</span>
-                          </li>
-                        ))}
-                        {lead.values.length > 3 && (
-                          <li className="text-gray-400">… weitere Felder</li>
-                        )}
-                      </ul>
-                    )}
+                  <td className="px-3 py-2 align-top">
+                    {lead.event?.name ?? "–"}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    {lead.capturedBy
+                      ? `${lead.capturedBy.name ?? "Unbekannt"}${
+                          lead.capturedBy.email
+                            ? ` (${lead.capturedBy.email})`
+                            : ""
+                        }`
+                      : "–"}
                   </td>
                 </tr>
               ))}
@@ -125,6 +145,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           </table>
         </div>
       )}
+
+      <div className="text-xs text-gray-400">
+        Hinweis: Der CSV-Export verwendet die gleichen Filter (Formular), die du
+        hier setzt.
+      </div>
     </div>
   );
 }
